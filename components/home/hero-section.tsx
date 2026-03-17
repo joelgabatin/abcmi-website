@@ -5,21 +5,13 @@ import { Heart, Calendar, BookOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 
 export async function HeroSection() {
-  let settings = null
-  
-  try {
-    const supabase = await createClient()
-    const { data } = await supabase
-      .from("site_settings")
-      .select("*")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    settings = data
-  } catch (error) {
-    // Gracefully handle Supabase errors
-    console.error("[v0] Failed to fetch settings:", error)
-  }
+  const supabase = await createClient()
+  const { data: settings } = await supabase
+    .from("site_settings")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   const churchName =
     settings?.church_name || "Arise and Build For Christ Ministries Inc."
