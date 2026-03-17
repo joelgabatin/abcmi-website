@@ -1,0 +1,145 @@
+"use client"
+
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+
+type UserRole = 'member' | 'admin'
+
+interface User {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+}
+
+interface AuthContextType {
+  user: User | null
+  isLoading: boolean
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  logout: () => void
+  isAdmin: boolean
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+// Demo users for demonstration purposes
+const DEMO_USERS: (User & { password: string })[] = [
+  { id: '1', name: 'Admin User', email: 'admin@church.org', password: 'admin123', role: 'admin' },
+  { id: '2', name: 'John Member', email: 'john@example.com', password: 'member123', role: 'member' },
+]
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // Check for stored session on mount (from localStorage or cookie)
+    let storedUser = localStorage.getItem('church_user')
+    
+    // If not in localStorage, try to parse from cookie
+    if (!storedUser && typeof document !== 'undefined') {
+      const cookieValue = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('church_user='))
+        ?.split('=')[1]
+      
+      if (cookieValue) {
+        try {
+          storedUser = decodeURIComponent(cookieValue)
+        } catch {
+          // Invalid cookie
+        }
+      }
+    }
+    
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser))
+      } catch {
+        localStorage.removeItem('church_user')
+      }
+    }
+    setIsLoading(false)
+  }, [])
+
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    const foundUser = DEMO_USERS.find(u => u.email === email && u.password === password)
+    
+    if (foundUser) {
+      const { password: _, ...userWithoutPassword } = foundUser
+      setUser(userWithoutPassword)
+      localStorage.setItem('church_user', JSON.stringify(userWithoutPassword))
+      
+      // Store in cookie for middleware access
+      if (typeof document !== 'undefined') {
+        document.cookie = `church_user=${JSON.stringify(userWithoutPassword)}; path=/; max-age=${7 * 24 * 60 * 60}` // 7 days
+      }
+      
+      return { success: true }
+    }
+    
+    return { success: false, error: 'Invalid email or password' }
+  }
+
+  const register = async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    // Check if email already exists
+    if (DEMO_USERS.some(u => u.email === email)) {
+      return { success: false, error: 'Email already registered' }
+    }
+    
+    // Create new user (in demo mode, just create a member)
+    const newUser: User = {
+      id: String(Date.now()),
+      name,
+      email,
+      role: 'member'
+    }
+    
+    setUser(newUser)
+    localStorage.setItem('church_user', JSON.stringify(newUser))
+    
+    // Store in cookie for middleware access
+    if (typeof document !== 'undefined') {
+      document.cookie = `church_user=${JSON.stringify(newUser)}; path=/; max-age=${7 * 24 * 60 * 60}` // 7 days
+    }
+    
+    return { success: true }
+  }
+
+  const logout = () => {
+    setUser(null)
+    localStorage.removeItem('church_user')
+    
+    // Remove cookie
+    if (typeof document !== 'undefined') {
+      document.cookie = 'church_user=; path=/; max-age=0'
+    }
+  }
+
+  return (
+    <AuthContext.Provider value={{ 
+      user, 
+      isLoading, 
+      login, 
+      register, 
+      logout,
+      isAdmin: user?.role === 'admin'
+    }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
+}
