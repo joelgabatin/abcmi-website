@@ -63,62 +63,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    const foundUser = DEMO_USERS.find(u => u.email === email && u.password === password)
-    
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser
-      setUser(userWithoutPassword)
-      localStorage.setItem('church_user', JSON.stringify(userWithoutPassword))
-      
-      // Store in cookie for middleware access
-      if (typeof document !== 'undefined') {
-        document.cookie = `church_user=${JSON.stringify(userWithoutPassword)}; path=/; max-age=${7 * 24 * 60 * 60}` // 7 days
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.user) {
+        setUser(data.user)
+        localStorage.setItem('church_user', JSON.stringify(data.user))
+        return { success: true }
       }
-      
-      return { success: true }
+
+      return { success: false, error: data.error || 'Login failed' }
+    } catch (error) {
+      console.error('[v0] Login error:', error)
+      return { success: false, error: 'An error occurred during login' }
     }
-    
-    return { success: false, error: 'Invalid email or password' }
   }
 
   const register = async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    // Check if email already exists
-    if (DEMO_USERS.some(u => u.email === email)) {
-      return { success: false, error: 'Email already registered' }
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.user) {
+        setUser(data.user)
+        localStorage.setItem('church_user', JSON.stringify(data.user))
+        return { success: true }
+      }
+
+      return { success: false, error: data.error || 'Registration failed' }
+    } catch (error) {
+      console.error('[v0] Registration error:', error)
+      return { success: false, error: 'An error occurred during registration' }
     }
-    
-    // Create new user (in demo mode, just create a member)
-    const newUser: User = {
-      id: String(Date.now()),
-      name,
-      email,
-      role: 'member'
-    }
-    
-    setUser(newUser)
-    localStorage.setItem('church_user', JSON.stringify(newUser))
-    
-    // Store in cookie for middleware access
-    if (typeof document !== 'undefined') {
-      document.cookie = `church_user=${JSON.stringify(newUser)}; path=/; max-age=${7 * 24 * 60 * 60}` // 7 days
-    }
-    
-    return { success: true }
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem('church_user')
-    
-    // Remove cookie
-    if (typeof document !== 'undefined') {
-      document.cookie = 'church_user=; path=/; max-age=0'
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch (error) {
+      console.error('[v0] Logout error:', error)
+    } finally {
+      setUser(null)
+      localStorage.removeItem('church_user')
     }
   }
 

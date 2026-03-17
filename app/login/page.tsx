@@ -136,8 +136,8 @@ export default function LoginPage() {
               <CardContent className="p-4">
                 <p className="text-sm font-medium text-foreground mb-2">Demo Credentials:</p>
                 <div className="space-y-1 text-sm text-muted-foreground">
-                  <p><span className="font-medium">Admin:</span> admin@church.org / admin123</p>
-                  <p><span className="font-medium">Member:</span> john@example.com / member123</p>
+                  <p><span className="font-medium">Admin:</span> admin@abcmi.com / admin123</p>
+                  <p><span className="font-medium">Member:</span> member@abcmi.com / member123</p>
                 </div>
               </CardContent>
             </Card>
