@@ -12,33 +12,33 @@ import { DashboardLayout } from '@/components/dashboard/dashboard-layout'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 
-interface SiteSettings {
-  id: string
-  church_name: string
-  tagline: string
+interface HeroSettings {
+  title: string
+  subtitle: string
   description: string
-  email: string
-  phone: string
+}
+
+interface AboutSettings {
+  mission: string
+  vision: string
+  values: string
+  history: string
+}
+
+interface ContactSettings {
   address: string
+  phone: string
+  email: string
   service_times: string
   facebook_url: string
   youtube_url: string
   instagram_url: string
-  twitter_url: string
-  hero_title: string
-  hero_subtitle: string
-  hero_description: string
-  about_short: string
-  mission_statement: string
-  vision_statement: string
-  core_values: string
-  founding_year: string
-  logo_url: string
-  hero_image_url: string
 }
 
 export default function ContentManagementPage() {
-  const [settings, setSettings] = useState<SiteSettings | null>(null)
+  const [hero, setHero] = useState<HeroSettings>({ title: '', subtitle: '', description: '' })
+  const [about, setAbout] = useState<AboutSettings>({ mission: '', vision: '', values: '', history: '' })
+  const [contact, setContact] = useState<ContactSettings>({ address: '', phone: '', email: '', service_times: '', facebook_url: '', youtube_url: '', instagram_url: '' })
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const { toast } = useToast()
@@ -52,41 +52,42 @@ export default function ContentManagementPage() {
     setIsLoading(true)
     const { data, error } = await supabase
       .from('site_settings')
-      .select('*')
-      .order('updated_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-    
-    if (error) {
-      // Silently handle errors
-      setSettings(null)
-    } else {
-      setSettings(data)
+      .select('key, value')
+
+    if (!error && data) {
+      for (const row of data) {
+        if (row.key === 'hero') setHero(row.value as HeroSettings)
+        if (row.key === 'about') setAbout(row.value as AboutSettings)
+        if (row.key === 'contact') setContact(row.value as ContactSettings)
+      }
     }
     setIsLoading(false)
   }
 
-  async function handleSave() {
-    if (!settings) return
-    
-    setIsSaving(true)
+  async function saveSection(key: string, value: object) {
     const { error } = await supabase
       .from('site_settings')
-      .update(settings)
-      .eq('id', settings.id)
-    
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+
     if (error) {
-      toast({ title: 'Error', description: 'Failed to save settings', variant: 'destructive' })
-    } else {
-      toast({ title: 'Success', description: 'Settings saved successfully' })
+      toast({ title: 'Error', description: `Failed to save ${key} settings`, variant: 'destructive' })
+      return false
     }
-    setIsSaving(false)
+    return true
   }
 
-  const updateSettings = (field: keyof SiteSettings, value: string) => {
-    if (settings) {
-      setSettings({ ...settings, [field]: value })
+  async function handleSave() {
+    setIsSaving(true)
+    const results = await Promise.all([
+      saveSection('hero', hero),
+      saveSection('about', about),
+      saveSection('contact', contact),
+    ])
+
+    if (results.every(Boolean)) {
+      toast({ title: 'Success', description: 'All settings saved successfully' })
     }
+    setIsSaving(false)
   }
 
   if (isLoading) {
@@ -111,84 +112,23 @@ export default function ContentManagementPage() {
               Manage your website content and settings
             </p>
           </div>
-          <Button 
-            onClick={handleSave} 
+          <Button
+            onClick={handleSave}
             disabled={isSaving}
             className="bg-[var(--church-primary)] hover:bg-[var(--church-primary-deep)] text-white"
           >
             <Save className="w-4 h-4 mr-2" />
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? 'Saving...' : 'Save All Changes'}
           </Button>
         </div>
 
-        <Tabs defaultValue="general" className="space-y-6">
+        <Tabs defaultValue="hero" className="space-y-6">
           <TabsList className="bg-background">
-            <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="hero">Hero Section</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
             <TabsTrigger value="social">Social Media</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="general">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Globe className="w-5 h-5" />
-                  General Information
-                </CardTitle>
-                <CardDescription>Basic information about your church</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="church_name">Church Name</Label>
-                    <Input
-                      id="church_name"
-                      value={settings?.church_name || ''}
-                      onChange={(e) => updateSettings('church_name', e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tagline">Tagline</Label>
-                    <Input
-                      id="tagline"
-                      value={settings?.tagline || ''}
-                      onChange={(e) => updateSettings('tagline', e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    rows={3}
-                    value={settings?.description || ''}
-                    onChange={(e) => updateSettings('description', e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="founding_year">Founding Year</Label>
-                    <Input
-                      id="founding_year"
-                      value={settings?.founding_year || ''}
-                      onChange={(e) => updateSettings('founding_year', e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="logo_url">Logo URL</Label>
-                    <Input
-                      id="logo_url"
-                      value={settings?.logo_url || ''}
-                      onChange={(e) => updateSettings('logo_url', e.target.value)}
-                      placeholder="https://..."
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           <TabsContent value="hero">
             <Card>
@@ -201,37 +141,31 @@ export default function ContentManagementPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="hero_title">Hero Title</Label>
+                  <Label htmlFor="hero_title">Church Name / Title</Label>
                   <Input
                     id="hero_title"
-                    value={settings?.hero_title || ''}
-                    onChange={(e) => updateSettings('hero_title', e.target.value)}
+                    value={hero.title}
+                    onChange={(e) => setHero({ ...hero, title: e.target.value })}
+                    placeholder="Arise and Build For Christ Ministries Inc."
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="hero_subtitle">Hero Subtitle</Label>
+                  <Label htmlFor="hero_subtitle">Subtitle</Label>
                   <Input
                     id="hero_subtitle"
-                    value={settings?.hero_subtitle || ''}
-                    onChange={(e) => updateSettings('hero_subtitle', e.target.value)}
+                    value={hero.subtitle}
+                    onChange={(e) => setHero({ ...hero, subtitle: e.target.value })}
+                    placeholder="Welcome to Our Church Family"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="hero_description">Hero Description</Label>
+                  <Label htmlFor="hero_description">Description</Label>
                   <Textarea
                     id="hero_description"
                     rows={3}
-                    value={settings?.hero_description || ''}
-                    onChange={(e) => updateSettings('hero_description', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hero_image_url">Hero Background Image URL</Label>
-                  <Input
-                    id="hero_image_url"
-                    value={settings?.hero_image_url || ''}
-                    onChange={(e) => updateSettings('hero_image_url', e.target.value)}
-                    placeholder="https://..."
+                    value={hero.description}
+                    onChange={(e) => setHero({ ...hero, description: e.target.value })}
+                    placeholder="A short description of your church..."
                   />
                 </div>
               </CardContent>
@@ -242,44 +176,47 @@ export default function ContentManagementPage() {
             <Card>
               <CardHeader>
                 <CardTitle>About Section</CardTitle>
-                <CardDescription>Mission, vision, and values content</CardDescription>
+                <CardDescription>Mission, vision, values, and history content</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="about_short">Short About (Homepage)</Label>
+                  <Label htmlFor="mission">Mission Statement</Label>
                   <Textarea
-                    id="about_short"
+                    id="mission"
                     rows={3}
-                    value={settings?.about_short || ''}
-                    onChange={(e) => updateSettings('about_short', e.target.value)}
+                    value={about.mission}
+                    onChange={(e) => setAbout({ ...about, mission: e.target.value })}
+                    placeholder="To spread the Gospel..."
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="mission_statement">Mission Statement</Label>
+                  <Label htmlFor="vision">Vision Statement</Label>
                   <Textarea
-                    id="mission_statement"
+                    id="vision"
                     rows={3}
-                    value={settings?.mission_statement || ''}
-                    onChange={(e) => updateSettings('mission_statement', e.target.value)}
+                    value={about.vision}
+                    onChange={(e) => setAbout({ ...about, vision: e.target.value })}
+                    placeholder="To see transformed lives..."
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="vision_statement">Vision Statement</Label>
+                  <Label htmlFor="values">Core Values</Label>
                   <Textarea
-                    id="vision_statement"
-                    rows={3}
-                    value={settings?.vision_statement || ''}
-                    onChange={(e) => updateSettings('vision_statement', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="core_values">Core Values</Label>
-                  <Textarea
-                    id="core_values"
-                    rows={3}
-                    value={settings?.core_values || ''}
-                    onChange={(e) => updateSettings('core_values', e.target.value)}
+                    id="values"
+                    rows={2}
+                    value={about.values}
+                    onChange={(e) => setAbout({ ...about, values: e.target.value })}
                     placeholder="Faith, Love, Integrity, Service"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="history">Church History</Label>
+                  <Textarea
+                    id="history"
+                    rows={4}
+                    value={about.history}
+                    onChange={(e) => setAbout({ ...about, history: e.target.value })}
+                    placeholder="Since 1986..."
                   />
                 </div>
               </CardContent>
@@ -305,8 +242,9 @@ export default function ContentManagementPage() {
                         id="email"
                         type="email"
                         className="pl-9"
-                        value={settings?.email || ''}
-                        onChange={(e) => updateSettings('email', e.target.value)}
+                        value={contact.email}
+                        onChange={(e) => setContact({ ...contact, email: e.target.value })}
+                        placeholder="info@abcmi.org"
                       />
                     </div>
                   </div>
@@ -318,8 +256,9 @@ export default function ContentManagementPage() {
                         id="phone"
                         type="tel"
                         className="pl-9"
-                        value={settings?.phone || ''}
-                        onChange={(e) => updateSettings('phone', e.target.value)}
+                        value={contact.phone}
+                        onChange={(e) => setContact({ ...contact, phone: e.target.value })}
+                        placeholder="+63 74 123 4567"
                       />
                     </div>
                   </div>
@@ -332,8 +271,9 @@ export default function ContentManagementPage() {
                       id="address"
                       className="pl-9"
                       rows={2}
-                      value={settings?.address || ''}
-                      onChange={(e) => updateSettings('address', e.target.value)}
+                      value={contact.address}
+                      onChange={(e) => setContact({ ...contact, address: e.target.value })}
+                      placeholder="Quirino Hill, Baguio City, Philippines"
                     />
                   </div>
                 </div>
@@ -345,9 +285,9 @@ export default function ContentManagementPage() {
                       id="service_times"
                       className="pl-9"
                       rows={3}
-                      value={settings?.service_times || ''}
-                      onChange={(e) => updateSettings('service_times', e.target.value)}
-                      placeholder="Sunday Worship: 9:00 AM - 12:00 PM&#10;Wednesday Prayer: 7:00 PM"
+                      value={contact.service_times}
+                      onChange={(e) => setContact({ ...contact, service_times: e.target.value })}
+                      placeholder="Sunday Worship: 9:00 AM - 12:00 PM"
                     />
                   </div>
                 </div>
@@ -359,7 +299,7 @@ export default function ContentManagementPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Facebook className="w-5 h-5" />
+                  <Globe className="w-5 h-5" />
                   Social Media Links
                 </CardTitle>
                 <CardDescription>Connect your social media accounts</CardDescription>
@@ -372,8 +312,8 @@ export default function ContentManagementPage() {
                     <Input
                       id="facebook_url"
                       className="pl-9"
-                      value={settings?.facebook_url || ''}
-                      onChange={(e) => updateSettings('facebook_url', e.target.value)}
+                      value={contact.facebook_url}
+                      onChange={(e) => setContact({ ...contact, facebook_url: e.target.value })}
                       placeholder="https://facebook.com/..."
                     />
                   </div>
@@ -385,8 +325,8 @@ export default function ContentManagementPage() {
                     <Input
                       id="youtube_url"
                       className="pl-9"
-                      value={settings?.youtube_url || ''}
-                      onChange={(e) => updateSettings('youtube_url', e.target.value)}
+                      value={contact.youtube_url}
+                      onChange={(e) => setContact({ ...contact, youtube_url: e.target.value })}
                       placeholder="https://youtube.com/..."
                     />
                   </div>
@@ -395,18 +335,9 @@ export default function ContentManagementPage() {
                   <Label htmlFor="instagram_url">Instagram</Label>
                   <Input
                     id="instagram_url"
-                    value={settings?.instagram_url || ''}
-                    onChange={(e) => updateSettings('instagram_url', e.target.value)}
+                    value={contact.instagram_url}
+                    onChange={(e) => setContact({ ...contact, instagram_url: e.target.value })}
                     placeholder="https://instagram.com/..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="twitter_url">Twitter/X</Label>
-                  <Input
-                    id="twitter_url"
-                    value={settings?.twitter_url || ''}
-                    onChange={(e) => updateSettings('twitter_url', e.target.value)}
-                    placeholder="https://twitter.com/..."
                   />
                 </div>
               </CardContent>

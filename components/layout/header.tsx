@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Menu, X, ChevronDown } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Menu, X, ChevronDown, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -11,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/auth-context"
 
 const navigation = [
   { name: "Home", href: "/" },
@@ -41,6 +43,9 @@ const navigation = [
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const { user, isLoading, logout } = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -49,6 +54,12 @@ export function Header() {
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    await logout()
+    router.push('/login')
+  }
 
   return (
     <header
@@ -109,16 +120,50 @@ export function Header() {
 
           {/* Auth Buttons */}
           <div className="hidden lg:flex items-center gap-2">
-            <Link href="/login">
-              <Button variant="ghost" className="text-foreground hover:text-[var(--church-primary)]">
-                Log In
-              </Button>
-            </Link>
-            <Link href="/register">
-              <Button className="bg-[var(--church-primary)] hover:bg-[var(--church-primary-deep)] text-white">
-                Join Us
-              </Button>
-            </Link>
+            {!isLoading && user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="text-foreground hover:text-[var(--church-primary)]">
+                    {user.name}
+                    <ChevronDown className="h-4 w-4 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-background border-border">
+                  {user.isAdmin && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="cursor-pointer hover:text-[var(--church-primary)]">
+                          Admin Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                      <div className="border-t border-border my-1" />
+                    </>
+                  )}
+                  <DropdownMenuItem asChild>
+                    <Link href="/member" className="cursor-pointer hover:text-[var(--church-primary)]">
+                      My Account
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    {isLoggingOut ? 'Logging out...' : 'Log Out'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="ghost" className="text-foreground hover:text-[var(--church-primary)]">
+                    Log In
+                  </Button>
+                </Link>
+                <Link href="/register">
+                  <Button className="bg-[var(--church-primary)] hover:bg-[var(--church-primary-deep)] text-white">
+                    Join Us
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -165,14 +210,41 @@ export function Header() {
               </div>
             ))}
             <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-border">
-              <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button variant="outline" className="w-full">Log In</Button>
-              </Link>
-              <Link href="/register" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button className="w-full bg-[var(--church-primary)] hover:bg-[var(--church-primary-deep)] text-white">
-                  Join Us
-                </Button>
-              </Link>
+              {!isLoading && user ? (
+                <>
+                  <p className="px-4 py-2 font-medium text-foreground">{user.name}</p>
+                  {user.role === 'admin' && (
+                    <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)}>
+                      <Button variant="outline" className="w-full">Admin Dashboard</Button>
+                    </Link>
+                  )}
+                  <Link href="/member" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Button variant="outline" className="w-full">My Account</Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                      handleLogout()
+                    }}
+                    disabled={isLoggingOut}
+                  >
+                    {isLoggingOut ? 'Logging out...' : 'Log Out'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Button variant="outline" className="w-full">Log In</Button>
+                  </Link>
+                  <Link href="/register" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Button className="w-full bg-[var(--church-primary)] hover:bg-[var(--church-primary-deep)] text-white">
+                      Join Us
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </nav>
         </div>

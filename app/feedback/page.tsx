@@ -9,18 +9,53 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { MessageSquare, Send, CheckCircle, Quote } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { useToast } from "@/hooks/use-toast"
 
 export default function FeedbackPage() {
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [type, setType] = useState("testimony")
+  const { toast } = useToast()
+  const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsLoading(false)
-    setIsSubmitted(true)
+
+    const formData = new FormData(e.currentTarget)
+    const name = (formData.get('name') as string)?.trim() || 'Anonymous'
+    const message = formData.get('message') as string
+
+    try {
+      if (type === 'testimony') {
+        const { error } = await supabase.from('testimonies').insert({
+          name,
+          content: message,
+          is_approved: false,
+          is_featured: false,
+        })
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('feedback').insert({
+          name,
+          type: 'feedback',
+          message,
+          status: 'unread',
+        })
+        if (error) throw error
+      }
+      setIsSubmitted(true)
+    } catch (error) {
+      console.error('Submission error:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to submit. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   if (isSubmitted) {
@@ -86,9 +121,10 @@ export default function FeedbackPage() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-2">
                     <Label htmlFor="name">Name (Optional)</Label>
-                    <Input 
-                      id="name" 
-                      placeholder="Your name" 
+                    <Input
+                      id="name"
+                      name="name"
+                      placeholder="Your name"
                       className="border-border focus:border-[var(--church-primary)] focus:ring-[var(--church-primary)]"
                     />
                     <p className="text-xs text-muted-foreground">You may share anonymously if you prefer.</p>
@@ -112,10 +148,11 @@ export default function FeedbackPage() {
                     <Label htmlFor="message">
                       {type === "testimony" ? "Your Testimony" : "Your Feedback"} *
                     </Label>
-                    <Textarea 
-                      id="message" 
-                      placeholder={type === "testimony" 
-                        ? "Share how God has been working in your life..." 
+                    <Textarea
+                      id="message"
+                      name="message"
+                      placeholder={type === "testimony"
+                        ? "Share how God has been working in your life..."
                         : "Share your thoughts, suggestions, or feedback..."
                       }
                       rows={6}

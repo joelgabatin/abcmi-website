@@ -42,32 +42,27 @@ const leaders = [
 
 export default async function AboutPage() {
   const supabase = await createClient()
-  const { data: settings } = await supabase
+  const { data: aboutSetting } = await supabase
     .from("site_settings")
-    .select("*")
-    .order("updated_at", { ascending: false })
-    .limit(1)
+    .select("value")
+    .eq("key", "about")
     .maybeSingle()
 
+  const aboutData = (aboutSetting?.value as Record<string, string> | null) ?? {}
+
   const mission =
-    settings?.mission_statement ||
+    aboutData.mission ||
     "To spread the Gospel of Jesus Christ, make disciples of all nations, build a community of believers rooted in faith, hope, and love, and plant churches that will transform communities."
 
   const vision =
-    settings?.vision_statement ||
+    aboutData.vision ||
     "To see transformed lives, strong families, and thriving communities through the power of the Gospel. We envision believers rising up to build for Christ in every nation."
 
   const coreValuesText =
-    settings?.core_values ||
+    aboutData.values ||
     "Faith in God, love for one another, integrity in all things, and commitment to serving our community with excellence."
 
-  const coreValues =
-    settings?.core_values && settings.core_values.trim().length > 0
-      ? settings.core_values
-          .split(",")
-          .map((value: string) => value.trim())
-          .filter(Boolean)
-      : null
+  const coreValues = null
 
   return (
     <SiteLayout>

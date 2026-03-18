@@ -17,23 +17,43 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const { login } = useAuth()
+  const [isResendingEmail, setIsResendingEmail] = useState(false)
+  const [showUnverifiedMessage, setShowUnverifiedMessage] = useState(false)
+  const { login, resendVerificationEmail } = useAuth()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setIsLoading(true)
+    setShowUnverifiedMessage(false)
 
     const result = await login(email, password)
-    
+
     if (result.success) {
       router.push('/member')
     } else {
+      if (result.error?.includes('verify')) {
+        setShowUnverifiedMessage(true)
+      }
       setError(result.error || 'Login failed')
     }
-    
+
     setIsLoading(false)
+  }
+
+  const handleResendVerification = async () => {
+    setIsResendingEmail(true)
+    setError('')
+    const result = await resendVerificationEmail(email)
+
+    if (result.success) {
+      setError('Verification email sent! Check your inbox.')
+    } else {
+      setError(result.error || 'Failed to resend verification email')
+    }
+
+    setIsResendingEmail(false)
   }
 
   return (
@@ -51,15 +71,31 @@ export default function LoginPage() {
                   Sign in to access your member account
                 </CardDescription>
               </CardHeader>
-              
+
               <form onSubmit={handleSubmit}>
                 <CardContent className="space-y-4">
                   {error && (
-                    <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm text-center">
+                    <div className={`p-3 rounded-lg text-sm text-center ${
+                      showUnverifiedMessage || error.includes('Verification email sent')
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'bg-destructive/10 text-destructive'
+                    }`}>
                       {error}
                     </div>
                   )}
-                  
+
+                  {showUnverifiedMessage && (
+                    <Button
+                      type="button"
+                      onClick={handleResendVerification}
+                      disabled={isResendingEmail}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      {isResendingEmail ? 'Sending...' : 'Resend Verification Email'}
+                    </Button>
+                  )}
+
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
                     <div className="relative">
@@ -75,7 +111,7 @@ export default function LoginPage() {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
                     <div className="relative">
@@ -98,30 +134,30 @@ export default function LoginPage() {
                       </button>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center justify-between text-sm">
-                    <Link 
-                      href="/forgot-password" 
+                    <Link
+                      href="/forgot-password"
                       className="text-[var(--church-primary)] hover:text-[var(--church-primary-deep)] transition-colors"
                     >
                       Forgot password?
                     </Link>
                   </div>
                 </CardContent>
-                
+
                 <CardFooter className="flex flex-col gap-4">
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="w-full bg-[var(--church-primary)] hover:bg-[var(--church-primary-deep)] text-white"
                     disabled={isLoading}
                   >
                     {isLoading ? 'Signing in...' : 'Sign In'}
                   </Button>
-                  
+
                   <p className="text-sm text-muted-foreground text-center">
                     {"Don't have an account? "}
-                    <Link 
-                      href="/register" 
+                    <Link
+                      href="/register"
                       className="text-[var(--church-primary)] hover:text-[var(--church-primary-deep)] font-medium transition-colors"
                     >
                       Register here
@@ -129,17 +165,6 @@ export default function LoginPage() {
                   </p>
                 </CardFooter>
               </form>
-            </Card>
-            
-            {/* Demo credentials */}
-            <Card className="mt-6 bg-[var(--church-gold)]/10 border-[var(--church-gold)]">
-              <CardContent className="p-4">
-                <p className="text-sm font-medium text-foreground mb-2">Demo Credentials:</p>
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <p><span className="font-medium">Admin:</span> admin@church.org / admin123</p>
-                  <p><span className="font-medium">Member:</span> john@example.com / member123</p>
-                </div>
-              </CardContent>
             </Card>
           </div>
         </div>

@@ -14,9 +14,8 @@ import { useToast } from '@/hooks/use-toast'
 
 interface Profile {
   id: string
-  first_name: string
-  last_name: string
-  email: string
+  full_name: string | null
+  email: string | null
   phone: string | null
   address: string | null
   avatar_url: string | null
@@ -28,8 +27,7 @@ export default function MemberSettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
+    full_name: '',
     phone: '',
     address: '',
   })
@@ -55,8 +53,7 @@ export default function MemberSettingsPage() {
     } else if (data) {
       setProfile(data)
       setFormData({
-        first_name: data.first_name || '',
-        last_name: data.last_name || '',
+        full_name: data.full_name || '',
         phone: data.phone || '',
         address: data.address || '',
       })
@@ -71,8 +68,7 @@ export default function MemberSettingsPage() {
     const { error } = await supabase
       .from('profiles')
       .update({
-        first_name: formData.first_name,
-        last_name: formData.last_name,
+        full_name: formData.full_name || null,
         phone: formData.phone || null,
         address: formData.address || null,
       })
@@ -123,25 +119,14 @@ export default function MemberSettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="first_name">First Name</Label>
-                  <Input
-                    id="first_name"
-                    value={formData.first_name}
-                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    placeholder="Enter your first name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="last_name">Last Name</Label>
-                  <Input
-                    id="last_name"
-                    value={formData.last_name}
-                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    placeholder="Enter your last name"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="full_name">Full Name</Label>
+                <Input
+                  id="full_name"
+                  value={formData.full_name}
+                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                  placeholder="Enter your full name"
+                />
               </div>
               
               <div className="space-y-2">

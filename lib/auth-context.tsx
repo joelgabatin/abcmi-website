@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createClient } from './supabase/client'
 
 type UserRole = 'member' | 'admin'
 
@@ -9,6 +10,7 @@ interface User {
   name: string
   email: string
   role: UserRole
+  emailVerified: boolean
 }
 
 interface AuthContextType {
@@ -16,119 +18,193 @@ interface AuthContextType {
   isLoading: boolean
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  logout: () => void
+  logout: () => Promise<void>
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>
+  resendVerificationEmail: (email?: string) => Promise<{ success: boolean; error?: string }>
   isAdmin: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Demo users for demonstration purposes
-const DEMO_USERS: (User & { password: string })[] = [
-  { id: '1', name: 'Admin User', email: 'admin@church.org', password: 'admin123', role: 'admin' },
-  { id: '2', name: 'John Member', email: 'john@example.com', password: 'member123', role: 'member' },
-]
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const supabase = createClient()
 
   useEffect(() => {
-    // Check for stored session on mount (from localStorage or cookie)
-    let storedUser = localStorage.getItem('church_user')
-    
-    // If not in localStorage, try to parse from cookie
-    if (!storedUser && typeof document !== 'undefined') {
-      const cookieValue = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('church_user='))
-        ?.split('=')[1]
-      
-      if (cookieValue) {
-        try {
-          storedUser = decodeURIComponent(cookieValue)
-        } catch {
-          // Invalid cookie
+    const initializeAuth = async () => {
+      try {
+        // Check current session
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (session?.user) {
+          await loadUserProfile(session.user.id, session.user.email || '')
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    initializeAuth()
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          await loadUserProfile(session.user.id, session.user.email || '')
+        } else {
+          setUser(null)
         }
       }
+    )
+
+    return () => {
+      subscription?.unsubscribe()
     }
-    
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser))
-      } catch {
-        localStorage.removeItem('church_user')
-      }
-    }
-    setIsLoading(false)
   }, [])
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    const foundUser = DEMO_USERS.find(u => u.email === email && u.password === password)
-    
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser
-      setUser(userWithoutPassword)
-      localStorage.setItem('church_user', JSON.stringify(userWithoutPassword))
-      
-      // Store in cookie for middleware access
-      if (typeof document !== 'undefined') {
-        document.cookie = `church_user=${JSON.stringify(userWithoutPassword)}; path=/; max-age=${7 * 24 * 60 * 60}` // 7 days
+  const loadUserProfile = async (userId: string, email: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role')
+        .eq('id', userId)
+        .single()
+
+      if (error) {
+        console.error('Error loading profile:', error)
+        return
       }
-      
-      return { success: true }
+
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+
+      setUser({
+        id: data.id,
+        name: data.full_name || '',
+        email: data.email,
+        role: data.role || 'member',
+        emailVerified: !!authUser?.email_confirmed_at
+      })
+    } catch (error) {
+      console.error('Error in loadUserProfile:', error)
     }
-    
-    return { success: false, error: 'Invalid email or password' }
+  }
+
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+
+      if (error) {
+        if (error.message.includes('Email not confirmed')) {
+          return { success: false, error: 'Please verify your email before logging in' }
+        }
+        return { success: false, error: error.message }
+      }
+
+      if (data.user) {
+        await loadUserProfile(data.user.id, data.user.email || '')
+      }
+
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: 'An error occurred during login' }
+    }
   }
 
   const register = async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    // Check if email already exists
-    if (DEMO_USERS.some(u => u.email === email)) {
-      return { success: false, error: 'Email already registered' }
+    try {
+      // Sign up user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      })
+
+      if (authError) {
+        return { success: false, error: authError.message }
+      }
+
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: 'An error occurred during registration' }
     }
-    
-    // Create new user (in demo mode, just create a member)
-    const newUser: User = {
-      id: String(Date.now()),
-      name,
-      email,
-      role: 'member'
-    }
-    
-    setUser(newUser)
-    localStorage.setItem('church_user', JSON.stringify(newUser))
-    
-    // Store in cookie for middleware access
-    if (typeof document !== 'undefined') {
-      document.cookie = `church_user=${JSON.stringify(newUser)}; path=/; max-age=${7 * 24 * 60 * 60}` // 7 days
-    }
-    
-    return { success: true }
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem('church_user')
-    
-    // Remove cookie
-    if (typeof document !== 'undefined') {
-      document.cookie = 'church_user=; path=/; max-age=0'
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
+
+  const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`
+      })
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: 'An error occurred' }
+    }
+  }
+
+  const resendVerificationEmail = async (email?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      let targetEmail = email
+
+      if (!targetEmail) {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        targetEmail = authUser?.email
+      }
+
+      if (!targetEmail) {
+        return { success: false, error: 'No email found' }
+      }
+
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: targetEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      })
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: 'An error occurred' }
     }
   }
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isLoading, 
-      login, 
-      register, 
+    <AuthContext.Provider value={{
+      user,
+      isLoading,
+      login,
+      register,
       logout,
+      resetPassword,
+      resendVerificationEmail,
       isAdmin: user?.role === 'admin'
     }}>
       {children}
