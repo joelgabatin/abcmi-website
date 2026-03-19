@@ -1,28 +1,40 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, EyeOff, UserPlus, Mail, Lock, User } from 'lucide-react'
+import { Eye, EyeOff, Lock, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
-import { useAuth } from '@/lib/auth-context'
+import { createClient } from '@/lib/supabase/client'
 import { SiteLayout } from '@/components/layout/site-layout'
 
-export default function RegisterPage() {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [agreeTerms, setAgreeTerms] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const { register } = useAuth()
+  const [isSuccess, setIsSuccess] = useState(false)
+  const [isCheckingToken, setIsCheckingToken] = useState(true)
   const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    const checkRecoverySession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        setError('Invalid or expired reset link. Please request a new one.')
+      }
+
+      setIsCheckingToken(false)
+    }
+
+    checkRecoverySession()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,22 +50,76 @@ export default function RegisterPage() {
       return
     }
 
-    if (!agreeTerms) {
-      setError('Please agree to the terms and conditions')
-      return
-    }
-
     setIsLoading(true)
 
-    const result = await register(name, email, password)
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: password
+      })
 
-    if (result.success) {
-      router.push('/verify-email')
-    } else {
-      setError(result.error || 'Registration failed')
+      if (updateError) {
+        setError(updateError.message)
+      } else {
+        setIsSuccess(true)
+        setTimeout(() => {
+          router.push('/login')
+        }, 2000)
+      }
+    } catch (err) {
+      setError('An error occurred while resetting your password')
+    } finally {
+      setIsLoading(false)
     }
+  }
 
-    setIsLoading(false)
+  if (isCheckingToken) {
+    return (
+      <SiteLayout>
+        <main className="min-h-screen bg-[var(--church-light-blue)] py-20">
+          <div className="container mx-auto px-4">
+            <div className="max-w-md mx-auto">
+              <Card className="shadow-lg border-0">
+                <CardContent className="p-8 text-center">
+                  <p>Loading...</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
+      </SiteLayout>
+    )
+  }
+
+  if (isSuccess) {
+    return (
+      <SiteLayout>
+        <main className="min-h-screen bg-[var(--church-light-blue)] py-20">
+          <div className="container mx-auto px-4">
+            <div className="max-w-md mx-auto">
+              <Card className="shadow-lg border-0">
+                <CardHeader className="text-center space-y-4">
+                  <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+                    <CheckCircle2 className="w-10 h-10 text-green-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-2xl font-bold text-foreground">Password Reset</CardTitle>
+                    <CardDescription className="mt-2">
+                      Your password has been successfully reset. Redirecting to login...
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+
+                <CardContent>
+                  <Button asChild className="w-full bg-[var(--church-primary)] hover:bg-[var(--church-primary-deep)] text-white">
+                    <Link href="/login">Go to Login</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
+      </SiteLayout>
+    )
   }
 
   return (
@@ -64,14 +130,14 @@ export default function RegisterPage() {
             <Card className="shadow-lg border-0">
               <CardHeader className="text-center space-y-2">
                 <div className="mx-auto w-16 h-16 bg-[var(--church-primary)] rounded-full flex items-center justify-center mb-4">
-                  <UserPlus className="w-8 h-8 text-white" />
+                  <Lock className="w-8 h-8 text-white" />
                 </div>
-                <CardTitle className="text-2xl font-bold text-foreground">Create Account</CardTitle>
+                <CardTitle className="text-2xl font-bold text-foreground">Create New Password</CardTitle>
                 <CardDescription>
-                  Join our church community today
+                  Enter your new password below
                 </CardDescription>
               </CardHeader>
-              
+
               <form onSubmit={handleSubmit}>
                 <CardContent className="space-y-4">
                   {error && (
@@ -79,47 +145,15 @@ export default function RegisterPage() {
                       {error}
                     </div>
                   )}
-                  
+
                   <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="name"
-                        type="text"
-                        placeholder="Your full name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="your@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">New Password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         id="password"
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Create a password"
+                        placeholder="Create a new password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className="pl-10 pr-10"
@@ -134,7 +168,7 @@ export default function RegisterPage() {
                       </button>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm Password</Label>
                     <div className="relative">
@@ -150,39 +184,25 @@ export default function RegisterPage() {
                       />
                     </div>
                   </div>
-                  
-                  <div className="flex items-start gap-2">
-                    <Checkbox
-                      id="terms"
-                      checked={agreeTerms}
-                      onCheckedChange={(checked) => setAgreeTerms(checked as boolean)}
-                    />
-                    <Label htmlFor="terms" className="text-sm text-muted-foreground leading-tight">
-                      I agree to the{' '}
-                      <Link href="/terms" className="text-[var(--church-primary)] hover:underline">
-                        Terms of Service
-                      </Link>{' '}
-                      and{' '}
-                      <Link href="/privacy" className="text-[var(--church-primary)] hover:underline">
-                        Privacy Policy
-                      </Link>
-                    </Label>
+
+                  <div className="text-sm text-muted-foreground">
+                    Password must be at least 6 characters
                   </div>
                 </CardContent>
-                
+
                 <CardFooter className="flex flex-col gap-4">
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="w-full bg-[var(--church-primary)] hover:bg-[var(--church-primary-deep)] text-white"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Creating account...' : 'Create Account'}
+                    {isLoading ? 'Resetting...' : 'Reset Password'}
                   </Button>
-                  
+
                   <p className="text-sm text-muted-foreground text-center">
-                    Already have an account?{' '}
-                    <Link 
-                      href="/login" 
+                    Remember your password?{' '}
+                    <Link
+                      href="/login"
                       className="text-[var(--church-primary)] hover:text-[var(--church-primary-deep)] font-medium transition-colors"
                     >
                       Sign in here

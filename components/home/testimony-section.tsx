@@ -2,8 +2,29 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Quote, ArrowRight } from "lucide-react"
+import { createClient } from "@/lib/supabase/server"
 
-export function TestimonySection() {
+export async function TestimonySection() {
+  const supabase = await createClient()
+
+  const [{ data: testimonies }, { data: verseRow }] = await Promise.all([
+    supabase
+      .from('testimonies')
+      .select('name, content')
+      .eq('is_approved', true)
+      .eq('is_featured', true)
+      .order('created_at', { ascending: false })
+      .limit(1),
+    supabase
+      .from('daily_verses')
+      .select('verse_text, reference')
+      .eq('date', new Date().toISOString().split('T')[0])
+      .maybeSingle(),
+  ])
+
+  const testimony = testimonies?.[0] ?? null
+  const verse = verseRow ?? null
+
   return (
     <section className="py-16 lg:py-24 bg-background">
       <div className="container mx-auto px-4">
@@ -24,15 +45,19 @@ export function TestimonySection() {
             <CardContent className="p-8 lg:p-12">
               <Quote className="w-12 h-12 text-[var(--church-primary)] opacity-50 mb-6" />
               <blockquote className="text-lg lg:text-xl text-foreground leading-relaxed mb-6 font-serif italic">
-                {'"'}When I first walked into Arise and Build For Christ Ministries, I was broken and searching for meaning. Through the love of this church family, the powerful teaching of God{`'`}s Word, and the transforming power of the Holy Spirit, I found new life in Christ. Today, I serve in the worship ministry, and my family has been restored. God is truly faithful!{'"'}
+                {testimony
+                  ? `"${testimony.content}"`
+                  : '"When I first walked into Arise and Build For Christ Ministries, I was broken and searching for meaning. Through the love of this church family, the powerful teaching of God\'s Word, and the transforming power of the Holy Spirit, I found new life in Christ. Today, I serve in the worship ministry, and my family has been restored. God is truly faithful!"'}
               </blockquote>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-[var(--church-primary)] flex items-center justify-center text-white font-bold">
-                  MJ
+                  {testimony
+                    ? testimony.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+                    : 'MJ'}
                 </div>
                 <div>
-                  <p className="font-semibold text-foreground">Maria J.</p>
-                  <p className="text-sm text-muted-foreground">Church Member since 2019</p>
+                  <p className="font-semibold text-foreground">{testimony?.name ?? 'Maria J.'}</p>
+                  <p className="text-sm text-muted-foreground">Church Member</p>
                 </div>
               </div>
             </CardContent>
@@ -44,9 +69,11 @@ export function TestimonySection() {
               <CardContent className="p-8">
                 <span className="text-white/80 text-sm font-medium uppercase tracking-wider">Verse of the Day</span>
                 <p className="text-xl lg:text-2xl font-serif italic mt-4 mb-4 leading-relaxed">
-                  {'"'}For I know the plans I have for you,{'"'} declares the LORD, {'"'}plans to prosper you and not to harm you, plans to give you hope and a future.{'"'}
+                  {verse?.verse_text ?? '"For I know the plans I have for you," declares the LORD, "plans to prosper you and not to harm you, plans to give you hope and a future."'}
                 </p>
-                <p className="text-[var(--church-gold)] font-semibold">Jeremiah 29:11</p>
+                <p className="text-[var(--church-gold)] font-semibold">
+                  {verse?.reference ?? 'Jeremiah 29:11'}
+                </p>
               </CardContent>
             </Card>
           </div>

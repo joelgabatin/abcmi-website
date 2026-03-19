@@ -34,15 +34,25 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // Check if email is verified for member/admin routes
+  if ((isAdminRoute || isMemberRoute) && user && !user.email_confirmed_at) {
+    return NextResponse.redirect(new URL('/verify-email', request.url))
+  }
+
   // For admin routes, check the role from profiles table
   if (isAdminRoute && user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
 
-    if (!profile || profile.role !== 'admin') {
+      if (!profile || profile.role !== 'admin') {
+        return NextResponse.redirect(new URL('/member', request.url))
+      }
+    } catch (error) {
+      console.error('Error checking admin role:', error)
       return NextResponse.redirect(new URL('/member', request.url))
     }
   }
