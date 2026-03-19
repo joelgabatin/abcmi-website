@@ -1,21 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname
-
-  // Check if trying to access protected routes
-  const isAdminRoute = pathname.startsWith('/admin')
-  const isMemberRoute = pathname.startsWith('/member')
-
-  // Public routes that don't need auth
-  if (!isAdminRoute && !isMemberRoute) {
-    return NextResponse.next()
-  }
-
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
+  let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,12 +13,8 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          )
-          supabaseResponse = NextResponse.next({
-            request,
-          })
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
           )
@@ -40,26 +23,24 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // If no user and trying to access protected routes, redirect to login
-  if (!user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+  const pathname = request.nextUrl.pathname
+  const isAdminRoute = pathname.startsWith('/admin')
+  const isMemberRoute = pathname.startsWith('/member')
+
+  // Redirect unauthenticated users away from protected routes
+  if ((isAdminRoute || isMemberRoute) && !user) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   // Check if email is verified for member/admin routes
-  if (!user.email_confirmed_at) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/verify-email'
-    return NextResponse.redirect(url)
+  if ((isAdminRoute || isMemberRoute) && user && !user.email_confirmed_at) {
+    return NextResponse.redirect(new URL('/verify-email', request.url))
   }
 
-  // If admin route, check user role
-  if (isAdminRoute) {
+  // For admin routes, check the role from profiles table
+  if (isAdminRoute && user) {
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -68,15 +49,11 @@ export async function middleware(request: NextRequest) {
         .single()
 
       if (!profile || profile.role !== 'admin') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/member'
-        return NextResponse.redirect(url)
+        return NextResponse.redirect(new URL('/member', request.url))
       }
     } catch (error) {
       console.error('Error checking admin role:', error)
-      const url = request.nextUrl.clone()
-      url.pathname = '/member'
-      return NextResponse.redirect(url)
+      return NextResponse.redirect(new URL('/member', request.url))
     }
   }
 

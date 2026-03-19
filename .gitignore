@@ -8,3 +8,10 @@ node_modules/
 .next/
 .env*.local
 .DS_Store
+
+# Sensitive config — never commit tokens or keys
+.claude/settings.local.json
+*.local.json
+.env
+.env.local
+.env.*.local

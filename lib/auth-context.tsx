@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { createClient } from './supabase/client'
+import { createClient } from '@/lib/supabase/client'
 
 type UserRole = 'member' | 'admin'
 
@@ -34,7 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Check current session
         const { data: { session } } = await supabase.auth.getSession()
 
         if (session?.user) {
@@ -49,7 +48,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initializeAuth()
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
@@ -118,13 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Sign up user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            full_name: name
+            full_name: name,
+            role: 'member',
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`
         }
