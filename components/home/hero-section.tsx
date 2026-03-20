@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function HeroSection() {
   const supabase = await createClient()
+<<<<<<< Updated upstream
   const { data: heroData } = await supabase
     .from("hero_section")
     .select("title, subtitle, description")
@@ -17,6 +18,22 @@ export async function HeroSection() {
   const heroSubtitle = heroData?.subtitle || "Welcome to Our Church Family"
   const heroDescription =
     heroData?.description ||
+=======
+  const { data: heroSetting } = await supabase
+    .from("site_settings")
+    .select("value")
+    .eq("key", "hero")
+    .maybeSingle()
+
+  const heroData = (heroSetting?.value as Record<string, string> | null) ?? {}
+
+  const heroTitle =
+    heroData.title || "Arise and Build For Christ Ministries Inc."
+  const heroSubtitle =
+    heroData.subtitle || "Welcome to Our Church Family"
+  const heroDescription =
+    heroData.description ||
+>>>>>>> Stashed changes
     "A faith-centered community dedicated to spreading the Gospel, nurturing believers, and building disciples for Christ. Join us in worship, prayer, and fellowship."
 
   return (

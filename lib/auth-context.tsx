@@ -72,7 +72,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single()
 
       if (error) {
-        console.error('Error loading profile:', error)
+        // PGRST116 = no rows found — profile missing, create it
+        if ((error as { code?: string }).code === 'PGRST116') {
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert({ id: userId, email, full_name: '', role: 'member' })
+            .select('id, full_name, email, role')
+            .single()
+
+          if (insertError) {
+            console.error('Error creating profile:', insertError.message, insertError.code)
+            return
+          }
+
+          const { data: { user: authUser } } = await supabase.auth.getUser()
+          setUser({
+            id: newProfile.id,
+            name: newProfile.full_name || '',
+            email: newProfile.email,
+            role: newProfile.role || 'member',
+            emailVerified: !!authUser?.email_confirmed_at
+          })
+          return
+        }
+
+        console.error('Error loading profile:', error.message, error.code, error.details)
         return
       }
 

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function AboutPreview() {
   const supabase = await createClient()
+<<<<<<< Updated upstream
   const { data: aboutData } = await supabase
     .from("about_section")
     .select("mission, vision, values, history")
@@ -26,6 +27,30 @@ export async function AboutPreview() {
 
   const history =
     aboutData?.history ||
+=======
+  const { data: aboutSetting } = await supabase
+    .from("site_settings")
+    .select("value")
+    .eq("key", "about")
+    .maybeSingle()
+
+  const aboutData = (aboutSetting?.value as Record<string, string> | null) ?? {}
+
+  const mission =
+    aboutData.mission ||
+    "To spread the Gospel of Jesus Christ, make disciples of all nations, and build a community of believers rooted in faith, hope, and love."
+
+  const vision =
+    aboutData.vision ||
+    "To see transformed lives, strong families, and thriving communities through the power of the Gospel and the love of Christ."
+
+  const coreValues =
+    aboutData.values ||
+    "Faith in God, love for one another, integrity in all things, and commitment to serving our community with excellence."
+
+  const historyText =
+    aboutData.history ||
+>>>>>>> Stashed changes
     "Since 1986, Arise and Build For Christ Ministries has been a beacon of hope, faith, and community in Baguio City and beyond."
 
   return (
@@ -39,7 +64,11 @@ export async function AboutPreview() {
               About Our Church
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+<<<<<<< Updated upstream
               {history}
+=======
+              {historyText}
+>>>>>>> Stashed changes
             </p>
           </div>
 

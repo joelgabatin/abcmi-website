@@ -3,6 +3,15 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Target, Eye, Heart, BookOpen, Users, Shield } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 
+<<<<<<< Updated upstream
+=======
+interface HistoryEntry {
+  id: string
+  year: string
+  month: string
+  event: string
+}
+>>>>>>> Stashed changes
 
 const defaultCoreValues = [
   { icon: BookOpen, title: "Biblical Foundation", description: "We hold the Bible as our ultimate authority for faith and practice." },
@@ -20,12 +29,22 @@ const leaders = [
 
 export default async function AboutPage() {
   const supabase = await createClient()
+<<<<<<< Updated upstream
   const [{ data: aboutData }, { data: historyData }] = await Promise.all([
     supabase.from("about_section").select("mission, vision, values").limit(1).maybeSingle(),
     supabase.from("church_history").select("year, event").order("display_order", { ascending: true }),
   ])
 
   const timelineEvents = historyData ?? []
+=======
+  const [{ data: aboutSetting }, { data: historySetting }] = await Promise.all([
+    supabase.from("site_settings").select("value").eq("key", "about").maybeSingle(),
+    supabase.from("site_settings").select("value").eq("key", "church_history").maybeSingle(),
+  ])
+
+  const aboutData = (aboutSetting?.value as Record<string, string> | null) ?? {}
+  const timelineEvents: HistoryEntry[] = (historySetting?.value as HistoryEntry[] | null) ?? []
+>>>>>>> Stashed changes
 
   const mission =
     aboutData?.mission ||
@@ -165,22 +184,22 @@ export default async function AboutPage() {
               {/* Timeline Events */}
               <div className="space-y-8">
                 {timelineEvents.map((item, index) => (
-                  <div key={index} className={`relative flex items-start gap-6 lg:gap-12 ${index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'}`}>
+                  <div key={item.id ?? index} className={`relative flex items-start gap-6 lg:gap-12 ${index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'}`}>
                     {/* Timeline Dot */}
                     <div className="absolute left-4 lg:left-1/2 w-4 h-4 rounded-full bg-[var(--church-primary)] border-4 border-background -translate-x-1/2 z-10" />
-                    
+
                     {/* Content */}
                     <div className={`ml-12 lg:ml-0 lg:w-[calc(50%-2rem)] ${index % 2 === 0 ? 'lg:pr-8 lg:text-right' : 'lg:pl-8 lg:text-left'}`}>
                       <Card className="bg-background border-none shadow-md">
                         <CardContent className="p-5">
                           <span className="inline-block px-3 py-1 bg-[var(--church-primary)] text-white text-sm font-bold rounded-full mb-2">
-                            {item.year}
+                            {item.year}{item.month ? ` ${item.month}` : ''}
                           </span>
                           <p className="text-muted-foreground text-sm leading-relaxed">{item.event}</p>
                         </CardContent>
                       </Card>
                     </div>
-                    
+
                     {/* Spacer for alternating layout */}
                     <div className="hidden lg:block lg:w-[calc(50%-2rem)]" />
                   </div>
