@@ -6,30 +6,27 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function AboutPreview() {
   const supabase = await createClient()
-  const { data: settings } = await supabase
-    .from("site_settings")
-    .select("*")
-    .order("updated_at", { ascending: false })
+  const { data: aboutData } = await supabase
+    .from("about_section")
+    .select("mission, vision, values, history")
     .limit(1)
     .maybeSingle()
 
-  const aboutShort =
-    settings?.about_short ||
-    "Since 1986, Arise and Build For Christ Ministries has been a beacon of hope, faith, and community in Baguio City and beyond."
-
   const mission =
-    settings?.mission_statement ||
+    aboutData?.mission ||
     "To spread the Gospel of Jesus Christ, make disciples of all nations, and build a community of believers rooted in faith, hope, and love."
 
   const vision =
-    settings?.vision_statement ||
+    aboutData?.vision ||
     "To see transformed lives, strong families, and thriving communities through the power of the Gospel and the love of Christ."
 
   const coreValues =
-    settings?.core_values ||
+    aboutData?.values ||
     "Faith in God, love for one another, integrity in all things, and commitment to serving our community with excellence."
 
-  const foundingYear = settings?.founding_year || "1986"
+  const history =
+    aboutData?.history ||
+    "Since 1986, Arise and Build For Christ Ministries has been a beacon of hope, faith, and community in Baguio City and beyond."
 
   return (
     <section id="about-preview" className="py-16 lg:py-24 bg-[var(--church-light-blue)]">
@@ -42,7 +39,7 @@ export async function AboutPreview() {
               About Our Church
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              {aboutShort}
+              {history}
             </p>
           </div>
 
@@ -90,7 +87,7 @@ export async function AboutPreview() {
             <div className="grid lg:grid-cols-2 gap-8 items-center">
               <div>
                 <span className="text-[var(--church-gold)] font-semibold text-sm uppercase tracking-wider">
-                  Est. {foundingYear}
+                  Est. 1986
                 </span>
                 <h3 className="text-2xl lg:text-3xl font-bold text-foreground mt-2 mb-4">
                   Our Journey of Faith

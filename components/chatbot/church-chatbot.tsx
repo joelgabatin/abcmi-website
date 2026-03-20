@@ -1,50 +1,89 @@
 "use client"
 
 import { useState, useRef, useEffect } from 'react'
-import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport, UIMessage } from 'ai'
 import { MessageCircle, X, Send, User, Bot, Minimize2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
-function getUIMessageText(msg: UIMessage): string {
-  if (!msg.parts || !Array.isArray(msg.parts)) return ''
-  return msg.parts
-    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
-    .join('')
+type Message = {
+  id: string
+  role: 'user' | 'assistant'
+  text: string
+}
+
+const WELCOME_MESSAGE: Message = {
+  id: 'welcome',
+  role: 'assistant',
+  text: "Hello! I'm Grace, your virtual church assistant. How can I help you today? Feel free to ask me about our services, ministries, events, or any other questions you might have.",
 }
 
 export default function ChurchChatbot() {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
   const [input, setInput] = useState('')
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
+  const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({ api: '/api/chat' }),
-    initialMessages: [
-      {
-        id: 'welcome',
-        role: 'assistant',
-        parts: [{ type: 'text', text: "Hello! I'm Grace, your virtual church assistant. How can I help you today? Feel free to ask me about our services, ministries, events, or any other questions you might have." }],
-      } as UIMessage,
-    ],
-  })
-
-  const isLoading = status === 'streaming' || status === 'submitted'
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || isLoading) return
+
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', text }
+    setMessages((prev) => [...prev, userMsg])
+    setInput('')
+    setIsLoading(true)
+
+    try {
+      const res = await fetch('/api/rasa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: 'user', message: text }),
+      })
+
+      if (!res.ok) throw new Error(`Server error: ${res.status}`)
+
+      const data: { text?: string }[] = await res.json()
+
+      const botReplies: Message[] = (data || [])
+        .filter((msg) => msg.text)
+        .map((msg, i) => ({
+          id: `${Date.now()}-${i}`,
+          role: 'assistant',
+          text: msg.text!,
+        }))
+
+      if (botReplies.length === 0) {
+        botReplies.push({
+          id: `${Date.now()}-fallback`,
+          role: 'assistant',
+          text: "I'm sorry, I didn't understand that. Could you rephrase your question?",
+        })
+      }
+
+      setMessages((prev) => [...prev, ...botReplies])
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-error`,
+          role: 'assistant',
+          text: 'Sorry, I could not connect to the server. Please make sure Rasa is running.',
+        },
+      ])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isLoading) return
-    sendMessage({ text: input })
-    setInput('')
+    sendMessage(input)
   }
 
   const quickQuestions = [
@@ -68,8 +107,8 @@ export default function ChurchChatbot() {
   return (
     <Card className={cn(
       "fixed z-50 shadow-xl border-0 transition-all duration-300",
-      isMinimized 
-        ? "bottom-6 right-6 w-72" 
+      isMinimized
+        ? "bottom-6 right-6 w-72"
         : "bottom-6 right-6 w-[380px] max-w-[calc(100vw-2rem)]"
     )}>
       {/* Header */}
@@ -109,41 +148,41 @@ export default function ChurchChatbot() {
         <CardContent className="p-0">
           {/* Messages */}
           <div className="h-80 overflow-y-auto p-4 space-y-4 bg-[var(--church-light-blue)]/50">
-            {messages.map((message) => {
-              const text = getUIMessageText(message)
-              if (!text) return null
-              
-              return (
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={cn(
+                  "flex gap-2",
+                  message.role === 'user' ? "justify-end" : "justify-start"
+                )}
+              >
+                {message.role === 'assistant' && (
+                  <div className="w-8 h-8 rounded-full bg-[var(--church-primary)] flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-4 h-4 text-white" />
+                  </div>
+                )}
                 <div
-                  key={message.id}
                   className={cn(
-                    "flex gap-2",
-                    message.role === 'user' ? "justify-end" : "justify-start"
+                    "max-w-[80%] px-4 py-2 rounded-2xl text-sm",
+                    message.role === 'user'
+                      ? "bg-[var(--church-primary)] text-white rounded-br-none"
+                      : "bg-white text-foreground shadow-sm rounded-bl-none"
                   )}
                 >
-                  {message.role === 'assistant' && (
-                    <div className="w-8 h-8 rounded-full bg-[var(--church-primary)] flex items-center justify-center flex-shrink-0">
-                      <Bot className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                  <div
-                    className={cn(
-                      "max-w-[80%] px-4 py-2 rounded-2xl text-sm",
-                      message.role === 'user'
-                        ? "bg-[var(--church-primary)] text-white rounded-br-none"
-                        : "bg-white text-foreground shadow-sm rounded-bl-none"
-                    )}
-                  >
-                    {text}
-                  </div>
-                  {message.role === 'user' && (
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      <User className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  )}
+                  {message.text.split('\n').map((line, i) => (
+                    <span key={i}>
+                      {line}
+                      {i < message.text.split('\n').length - 1 && <br />}
+                    </span>
+                  ))}
                 </div>
-              )
-            })}
+                {message.role === 'user' && (
+                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+            ))}
             {isLoading && (
               <div className="flex gap-2 items-start">
                 <div className="w-8 h-8 rounded-full bg-[var(--church-primary)] flex items-center justify-center flex-shrink-0">
@@ -169,9 +208,7 @@ export default function ChurchChatbot() {
                 {quickQuestions.map((question) => (
                   <button
                     key={question}
-                    onClick={() => {
-                      sendMessage({ text: question })
-                    }}
+                    onClick={() => sendMessage(question)}
                     className="text-xs px-3 py-1.5 rounded-full bg-[var(--church-primary)]/10 text-[var(--church-primary)] hover:bg-[var(--church-primary)]/20 transition-colors"
                   >
                     {question}

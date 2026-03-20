@@ -3,28 +3,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Target, Eye, Heart, BookOpen, Users, Shield } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 
-const timelineEvents = [
-  { year: "1984", event: "The revival began at Quirino Hill Barangay/Village." },
-  { year: "1986", event: "Arise and Build For Christ Ministries was founded by Rev. Marino S. Coyoy and Elizabeth L. Coyoy. It started as a house church." },
-  { year: "1990", event: "A new location and a wider worship space were provided." },
-  { year: "1991", event: "A daughter church was started by Ptr. Ernesto Paleyan in Patiacan, Quirino, Ilocos Sur." },
-  { year: "1992", event: "Another wider space was provided to accommodate more people." },
-  { year: "1994", event: "A parcel of land was donated by Col. Hover S. Coyoy, which became a permanent place of worship. Additional pastoral team members were added." },
-  { year: "1995", event: "Church planting started at Camp 8, Baguio City." },
-  { year: "1997", event: "Arise and Build For Christ Ministries Inc. became the registered name under the SEC." },
-  { year: "2000", event: "Church planting began at Nangobongan, San Juan, Abra." },
-  { year: "2004", event: "Church planting started at Manabo, Abra through Ptr. Elmo Salingbay." },
-  { year: "2007", event: "Ptr. Ysrael L. Coyoy became the resident pastor of ABCMI Quirino Hill." },
-  { year: "2009", event: "Church planting started at Maria Aurora, Aurora." },
-  { year: "2012", event: "Church planting began at Lower Decoliat, Alfonso Castañeda, Nueva Vizcaya." },
-  { year: "2014", event: "A house church started through Bible study with the Bayanos family in San Carlos, Baguio City." },
-  { year: "2015", event: "House churches started at Idogan, San Carlos (March) and Kias, Baguio City (September)." },
-  { year: "2016", event: "Church planting started at Dalic, Bontoc, Mt. Province." },
-  { year: "2017", event: "Church planting started at Ansagan, Tuba, Benguet." },
-  { year: "2019", event: "VBS, Crusade, and Church Planting were conducted at Abas, Sallapadan, Abra." },
-  { year: "2023", event: "The church adopted church planting works at Tuding, Itogon, Benguet and in Vientiane, Laos (November)." },
-  { year: "2024", event: "Church planting started at Palina, Tuba, Benguet (March)." },
-]
 
 const defaultCoreValues = [
   { icon: BookOpen, title: "Biblical Foundation", description: "We hold the Bible as our ultimate authority for faith and practice." },
@@ -42,24 +20,23 @@ const leaders = [
 
 export default async function AboutPage() {
   const supabase = await createClient()
-  const { data: aboutSetting } = await supabase
-    .from("site_settings")
-    .select("value")
-    .eq("key", "about")
-    .maybeSingle()
+  const [{ data: aboutData }, { data: historyData }] = await Promise.all([
+    supabase.from("about_section").select("mission, vision, values").limit(1).maybeSingle(),
+    supabase.from("church_history").select("year, event").order("display_order", { ascending: true }),
+  ])
 
-  const aboutData = (aboutSetting?.value as Record<string, string> | null) ?? {}
+  const timelineEvents = historyData ?? []
 
   const mission =
-    aboutData.mission ||
+    aboutData?.mission ||
     "To spread the Gospel of Jesus Christ, make disciples of all nations, build a community of believers rooted in faith, hope, and love, and plant churches that will transform communities."
 
   const vision =
-    aboutData.vision ||
+    aboutData?.vision ||
     "To see transformed lives, strong families, and thriving communities through the power of the Gospel. We envision believers rising up to build for Christ in every nation."
 
   const coreValuesText =
-    aboutData.values ||
+    aboutData?.values ||
     "Faith in God, love for one another, integrity in all things, and commitment to serving our community with excellence."
 
   const coreValues = null

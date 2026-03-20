@@ -1,5 +1,11 @@
 {
   "disabledMcpjsonServers": [
     "supabase"
-  ]
+  ],
+    "permissions": {
+    "defaultMode": "acceptEdits"
+  }
 }
+
+
+

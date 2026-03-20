@@ -3,12 +3,12 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { 
+import {
   Home,
-  Users, 
-  Calendar, 
-  Heart, 
-  MessageSquare, 
+  Users,
+  Calendar,
+  Heart,
+  MessageSquare,
   DollarSign,
   FileText,
   BarChart3,
@@ -18,7 +18,8 @@ import {
   User,
   LogOut,
   ChevronRight,
-  Church
+  Church,
+  Clock
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import {
@@ -51,6 +52,7 @@ const adminNavItems = [
   { title: 'Counseling', icon: MessageSquare, href: '/admin/counseling' },
   { title: 'Donations', icon: DollarSign, href: '/admin/donations' },
   { title: 'Content', icon: FileText, href: '/admin/content' },
+  { title: 'Church History', icon: Clock, href: '/admin/history' },
   { title: 'Reports', icon: BarChart3, href: '/admin/reports' },
 ]
 

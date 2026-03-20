@@ -30,15 +30,24 @@ interface ContactSettings {
   phone: string
   email: string
   service_times: string
+}
+
+interface SocialSettings {
   facebook_url: string
   youtube_url: string
   instagram_url: string
 }
 
 export default function ContentManagementPage() {
+  const [heroId, setHeroId] = useState<string | null>(null)
+  const [aboutId, setAboutId] = useState<string | null>(null)
+  const [contactId, setContactId] = useState<string | null>(null)
+
   const [hero, setHero] = useState<HeroSettings>({ title: '', subtitle: '', description: '' })
   const [about, setAbout] = useState<AboutSettings>({ mission: '', vision: '', values: '', history: '' })
-  const [contact, setContact] = useState<ContactSettings>({ address: '', phone: '', email: '', service_times: '', facebook_url: '', youtube_url: '', instagram_url: '' })
+  const [contact, setContact] = useState<ContactSettings>({ address: '', phone: '', email: '', service_times: '' })
+  const [social, setSocial] = useState<SocialSettings>({ facebook_url: '', youtube_url: '', instagram_url: '' })
+
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const { toast } = useToast()
@@ -50,42 +59,146 @@ export default function ContentManagementPage() {
 
   async function fetchSettings() {
     setIsLoading(true)
-    const { data, error } = await supabase
-      .from('site_settings')
-      .select('key, value')
 
-    if (!error && data) {
-      for (const row of data) {
-        if (row.key === 'hero') setHero(row.value as HeroSettings)
-        if (row.key === 'about') setAbout(row.value as AboutSettings)
-        if (row.key === 'contact') setContact(row.value as ContactSettings)
+    const [heroRes, aboutRes, contactRes] = await Promise.all([
+      supabase.from('hero_section').select('*').limit(1).maybeSingle(),
+      supabase.from('about_section').select('*').limit(1).maybeSingle(),
+      supabase.from('contact_info').select('*').limit(1).maybeSingle(),
+    ])
+
+    if (heroRes.data) {
+      setHeroId(heroRes.data.id)
+      setHero({
+        title: heroRes.data.title,
+        subtitle: heroRes.data.subtitle,
+        description: heroRes.data.description,
+      })
+    }
+
+    if (aboutRes.data) {
+      setAboutId(aboutRes.data.id)
+      setAbout({
+        mission: aboutRes.data.mission,
+        vision: aboutRes.data.vision,
+        values: aboutRes.data.values,
+        history: aboutRes.data.history,
+      })
+    }
+
+    if (contactRes.data) {
+      setContactId(contactRes.data.id)
+      setContact({
+        address: contactRes.data.address,
+        phone: contactRes.data.phone,
+        email: contactRes.data.email,
+        service_times: contactRes.data.service_times,
+      })
+
+      const { data: socialData } = await supabase
+        .from('social_links')
+        .select('platform, url')
+        .eq('contact_info_id', contactRes.data.id)
+
+      if (socialData) {
+        const newSocial: SocialSettings = { facebook_url: '', youtube_url: '', instagram_url: '' }
+        for (const link of socialData) {
+          if (link.platform === 'facebook') newSocial.facebook_url = link.url
+          if (link.platform === 'youtube') newSocial.youtube_url = link.url
+          if (link.platform === 'instagram') newSocial.instagram_url = link.url
+        }
+        setSocial(newSocial)
       }
     }
+
     setIsLoading(false)
   }
 
-  async function saveSection(key: string, value: object) {
-    const { error } = await supabase
-      .from('site_settings')
-      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
-
-    if (error) {
-      toast({ title: 'Error', description: `Failed to save ${key} settings`, variant: 'destructive' })
-      return false
+  async function saveHero(): Promise<boolean> {
+    if (heroId) {
+      const { error } = await supabase
+        .from('hero_section')
+        .update({ ...hero, updated_at: new Date().toISOString() })
+        .eq('id', heroId)
+      return !error
+    } else {
+      const { data, error } = await supabase
+        .from('hero_section')
+        .insert({ ...hero })
+        .select('id')
+        .single()
+      if (!error && data) setHeroId(data.id)
+      return !error
     }
+  }
+
+  async function saveAbout(): Promise<boolean> {
+    if (aboutId) {
+      const { error } = await supabase
+        .from('about_section')
+        .update({ ...about, updated_at: new Date().toISOString() })
+        .eq('id', aboutId)
+      return !error
+    } else {
+      const { data, error } = await supabase
+        .from('about_section')
+        .insert({ ...about })
+        .select('id')
+        .single()
+      if (!error && data) setAboutId(data.id)
+      return !error
+    }
+  }
+
+  async function saveContact(): Promise<boolean> {
+    let cId = contactId
+
+    if (cId) {
+      const { error } = await supabase
+        .from('contact_info')
+        .update({ ...contact, updated_at: new Date().toISOString() })
+        .eq('id', cId)
+      if (error) return false
+    } else {
+      const { data, error } = await supabase
+        .from('contact_info')
+        .insert({ ...contact })
+        .select('id')
+        .single()
+      if (error) return false
+      if (data) {
+        cId = data.id
+        setContactId(data.id)
+      }
+    }
+
+    if (!cId) return false
+
+    // Upsert each social link as its own row using (contact_info_id, platform) uniqueness
+    const platforms: { platform: string; url: string }[] = [
+      { platform: 'facebook', url: social.facebook_url },
+      { platform: 'youtube', url: social.youtube_url },
+      { platform: 'instagram', url: social.instagram_url },
+    ]
+
+    for (const { platform, url } of platforms) {
+      const { error } = await supabase.from('social_links').upsert(
+        { contact_info_id: cId, platform, url, updated_at: new Date().toISOString() },
+        { onConflict: 'contact_info_id,platform' }
+      )
+      if (error) return false
+    }
+
     return true
   }
 
   async function handleSave() {
     setIsSaving(true)
-    const results = await Promise.all([
-      saveSection('hero', hero),
-      saveSection('about', about),
-      saveSection('contact', contact),
-    ])
+    const results = await Promise.all([saveHero(), saveAbout(), saveContact()])
 
     if (results.every(Boolean)) {
       toast({ title: 'Success', description: 'All settings saved successfully' })
+    } else {
+      toast({ title: 'Error', description: 'Some settings failed to save', variant: 'destructive' })
     }
     setIsSaving(false)
   }
@@ -312,8 +425,8 @@ export default function ContentManagementPage() {
                     <Input
                       id="facebook_url"
                       className="pl-9"
-                      value={contact.facebook_url}
-                      onChange={(e) => setContact({ ...contact, facebook_url: e.target.value })}
+                      value={social.facebook_url}
+                      onChange={(e) => setSocial({ ...social, facebook_url: e.target.value })}
                       placeholder="https://facebook.com/..."
                     />
                   </div>
@@ -325,8 +438,8 @@ export default function ContentManagementPage() {
                     <Input
                       id="youtube_url"
                       className="pl-9"
-                      value={contact.youtube_url}
-                      onChange={(e) => setContact({ ...contact, youtube_url: e.target.value })}
+                      value={social.youtube_url}
+                      onChange={(e) => setSocial({ ...social, youtube_url: e.target.value })}
                       placeholder="https://youtube.com/..."
                     />
                   </div>
@@ -335,8 +448,8 @@ export default function ContentManagementPage() {
                   <Label htmlFor="instagram_url">Instagram</Label>
                   <Input
                     id="instagram_url"
-                    value={contact.instagram_url}
-                    onChange={(e) => setContact({ ...contact, instagram_url: e.target.value })}
+                    value={social.instagram_url}
+                    onChange={(e) => setSocial({ ...social, instagram_url: e.target.value })}
                     placeholder="https://instagram.com/..."
                   />
                 </div>
